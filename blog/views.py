@@ -4,7 +4,7 @@ from django.db.models import Count
 
 
 def get_related_posts_count(tag):
-    return tag.posts.count()
+    return tag.tags_amount
 
 def get_likes_count(post):
     return post.likes_amount
@@ -39,9 +39,9 @@ def index(request):
     fresh_posts = Post.objects.order_by('published_at')
     most_fresh_posts = list(fresh_posts)[-5:]
 
-    tags = Tag.objects.all()
-    popular_tags = sorted(tags, key=get_related_posts_count)
-    most_popular_tags = popular_tags[-5:]
+    tags = Tag.objects.annotate(tags_amount=Count('posts')) 
+    popular_tags = tags.order_by('-tags_amount')
+    most_popular_tags = popular_tags[0:5]
 
     context = {
         'most_popular_posts': [
