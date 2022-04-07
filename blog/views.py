@@ -1,12 +1,13 @@
 from django.shortcuts import render
 from blog.models import Comment, Post, Tag
+from django.db.models import Count
 
 
 def get_related_posts_count(tag):
     return tag.posts.count()
 
 def get_likes_count(post):
-    return post.likes.count()
+    return post.annotate(likes=Count('likes'))
 
 
 def serialize_post(post):
