@@ -7,7 +7,7 @@ def get_related_posts_count(tag):
     return tag.posts.count()
 
 def get_likes_count(post):
-    return post.annotate(likes=Count('likes'))
+    return post.likes_amount
 
 
 def serialize_post(post):
@@ -32,7 +32,7 @@ def serialize_tag(tag):
 
 
 def index(request):
-    posts = Post.objects.all()
+    posts = Post.objects.annotate(likes_amount=Count('likes')) 
     sort_post = sorted(posts, key=get_likes_count)
     most_popular_posts = sort_post[-6:-1]  # TODO. Как это посчитать?
 
