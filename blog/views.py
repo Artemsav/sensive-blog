@@ -11,6 +11,9 @@ def get_likes_count(post):
 
 
 def serialize_post(post):
+    posts = Post.objects.prefetch_related('author')
+    #post.author.username
+    #posts.get(pk=post.id).author.username
     return {
         'title': post.title,
         'teaser_text': post.text[:200],
@@ -36,8 +39,8 @@ def index(request):
     sort_post = posts.order_by('-likes_amount')
     most_popular_posts = sort_post[0:5]  # TODO. Как это посчитать?
 
-    fresh_posts = Post.objects.order_by('published_at')
-    most_fresh_posts = list(fresh_posts)[-5:]
+    fresh_posts = Post.objects.order_by('-published_at')
+    most_fresh_posts = fresh_posts[0:5]
 
     tags = Tag.objects.annotate(tags_amount=Count('posts')) 
     popular_tags = tags.order_by('-tags_amount')
@@ -45,9 +48,9 @@ def index(request):
 
     context = {
         'most_popular_posts': [
-            serialize_post(post) for post in most_popular_posts
+            serialize_post(post) for post in most_popular_posts.prefetch_related('author')
         ],
-        'page_posts': [serialize_post(post) for post in most_fresh_posts],
+        'page_posts': [serialize_post(post) for post in most_fresh_posts.prefetch_related('author')],
         'popular_tags': [serialize_tag(tag) for tag in most_popular_tags],
     }
     return render(request, 'index.html', context)
