@@ -11,9 +11,6 @@ def get_likes_count(post):
 
 
 def serialize_post(post):
-    posts = Post.objects.prefetch_related('author')
-    #post.author.username
-    #posts.get(pk=post.id).author.username
     return {
         'title': post.title,
         'teaser_text': post.text[:200],
