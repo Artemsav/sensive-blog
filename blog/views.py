@@ -1,13 +1,14 @@
+from tkinter.messagebox import YES
 from django.shortcuts import render
 from blog.models import Comment, Post, Tag
 from django.db.models import Count
 
 
 def get_related_posts_count(tag):
-    return tag.tags_amount
+    return tag.posts.count()
 
 def get_likes_count(post):
-    return post.likes_amount
+    return post.count()
 
 
 def serialize_post(post):
@@ -24,6 +25,21 @@ def serialize_post(post):
     }
 
 
+def serialize_post_optimized(post, comments_amount):
+    #len(Comment.objects.filter(post=post))
+    return {
+        'title': post.title,
+        'teaser_text': post.text[:200],
+        'author': post.author.username,
+        'comments_amount': comments_amount,
+        'image_url': post.image.url if post.image else None,
+        'published_at': post.published_at,
+        'slug': post.slug,
+        'tags': [serialize_tag(tag) for tag in post.tags.all()],
+        'first_tag_title': post.tags.all()[0].title,
+    }
+
+
 def serialize_tag(tag):
     return {
         'title': tag.title,
@@ -32,22 +48,22 @@ def serialize_tag(tag):
 
 
 def index(request):
-    posts = Post.objects.annotate(likes_amount=Count('likes')) 
-    sort_post = posts.order_by('-likes_amount')
-    most_popular_posts = sort_post[0:5]  # TODO. Как это посчитать?
-
-    fresh_posts = Post.objects.order_by('-published_at')
+    most_popular_posts = Post.objects.annotate(likes_amount=Count('likes')).order_by('-likes_amount')
+    most_popular_posts_ids = [post.id for post in most_popular_posts]
+    posts_with_comments = Post.objects.filter(id__in=most_popular_posts_ids).annotate(comments_count=Count('comments'))
+    ids_and_comments = posts_with_comments.values_list('id', 'comments_count')
+    count_for_id = dict(ids_and_comments)
+    fresh_posts = most_popular_posts.order_by('-published_at')
     most_fresh_posts = fresh_posts[0:5]
-
     tags = Tag.objects.annotate(tags_amount=Count('posts')) 
     popular_tags = tags.order_by('-tags_amount')
     most_popular_tags = popular_tags[0:5]
 
     context = {
         'most_popular_posts': [
-            serialize_post(post) for post in most_popular_posts.prefetch_related('author')
+            serialize_post_optimized(post, count_for_id[post.id]) for post in most_popular_posts.prefetch_related('author')[0:5]
         ],
-        'page_posts': [serialize_post(post) for post in most_fresh_posts.prefetch_related('author')],
+        'page_posts': [serialize_post_optimized(post, count_for_id[post.id]) for post in most_fresh_posts.prefetch_related('author')],
         'popular_tags': [serialize_tag(tag) for tag in most_popular_tags],
     }
     return render(request, 'index.html', context)
