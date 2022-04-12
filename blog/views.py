@@ -26,8 +26,7 @@ def serialize_post(post):
 
 
 def serialize_post_optimized(post, comments_amount):
-    #len(Comment.objects.filter(post=post))
-    return {
+        return {
         'title': post.title,
         'teaser_text': post.text[:200],
         'author': post.author.username,
@@ -41,9 +40,11 @@ def serialize_post_optimized(post, comments_amount):
 
 
 def serialize_tag(tag):
+    #len(Post.objects.filter(tags=tag))
+    #tags = tag.posts.annotate(post_amount=Count('likes'))
     return {
         'title': tag.title,
-        'posts_with_tag': len(Post.objects.filter(tags=tag)),
+        'posts_with_tag': len(tag.posts.all()),
     }
 
 
@@ -56,10 +57,10 @@ def index(request):
 
     context = {
         'most_popular_posts': [
-            serialize_post_optimized(post, count_for_id[post.id]) for post in most_popular_posts.prefetch_related('author')[:5]
+            serialize_post_optimized(post, count_for_id[post.id]) for post in most_popular_posts.prefetch_related('author').prefetch_related('tags')[:5]
         ],
-        'page_posts': [serialize_post_optimized(post, count_for_id[post.id]) for post in most_fresh_posts.prefetch_related('author')],
-        'popular_tags': [serialize_tag(tag) for tag in most_popular_tags],
+        'page_posts': [serialize_post_optimized(post, count_for_id[post.id]) for post in most_fresh_posts.prefetch_related('author').prefetch_related('tags')],
+        'popular_tags': [serialize_tag(tag) for tag in most_popular_tags.prefetch_related('posts')],
     }
     return render(request, 'index.html', context)
 
