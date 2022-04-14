@@ -80,7 +80,7 @@ def index(request):
 
 def post_detail(request, slug):
     most_popular_posts = Post.objects.popular()
-    post = most_popular_posts.annotate(likes_amount=Count('likes')).get(slug=slug)
+    post = most_popular_posts.annotate(likes_amount=Count('likes')).select_related('author').get(slug=slug)
     comments = Comment.objects.filter(post=post).prefetch_related('author')
     serialized_comments = []
     for comment in comments:
