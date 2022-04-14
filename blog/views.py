@@ -1,11 +1,14 @@
 from tkinter.messagebox import YES
-from django.shortcuts import render
-from blog.models import Comment, Post, Tag
+
 from django.db.models import Count, Prefetch
+from django.shortcuts import render
+
+from blog.models import Comment, Post, Tag
 
 
 def get_related_posts_count(tag):
     return tag.posts.count()
+
 
 def get_likes_count(post):
     return post.count()
@@ -26,7 +29,7 @@ def serialize_post(post):
 
 
 def serialize_post_optimized(post, comments_amount):
-        return {
+    return {
         'title': post.title,
         'teaser_text': post.text[:200],
         'author': post.author.username,
@@ -63,9 +66,10 @@ def index(request):
         'most_popular_posts': [
             serialize_post_optimized(post, count_for_id[post.id]) for post in most_popular_posts.prefetch_related(Prefetch('author'),
                                                                                                                   Prefetch('tags', 
-                                                                                                                            queryset=(Tag.objects.annotate(post_amount=Count('posts')))))[:5]
+                                                                                                                           queryset=(Tag.objects.annotate(post_amount=Count('posts')))))[:5]
         ],
-        'page_posts': [serialize_post_optimized(post, count_for_id[post.id]) for post in most_fresh_posts.prefetch_related(Prefetch('author'),
+        'page_posts': [
+            serialize_post_optimized(post, count_for_id[post.id]) for post in most_fresh_posts.prefetch_related(Prefetch('author'),
                                                                                                                            Prefetch('tags', 
                                                                                                                            queryset=(Tag.objects.annotate(post_amount=Count('posts')))))
         ],
@@ -75,8 +79,9 @@ def index(request):
 
 
 def post_detail(request, slug):
-    post = Post.objects.get(slug=slug)
-    comments = Comment.objects.filter(post=post)
+    most_popular_posts = Post.objects.popular()
+    post = most_popular_posts.annotate(likes_amount=Count('likes')).get(slug=slug)
+    comments = Comment.objects.filter(post=post).prefetch_related('author')
     serialized_comments = []
     for comment in comments:
         serialized_comments.append({
@@ -85,25 +90,21 @@ def post_detail(request, slug):
             'author': comment.author.username,
         })
 
-    likes = post.likes.all()
-
-    related_tags = post.tags.all()
+    related_tags = post.tags.all().annotate(post_amount=Count('posts'))
 
     serialized_post = {
         'title': post.title,
         'text': post.text,
         'author': post.author.username,
         'comments': serialized_comments,
-        'likes_amount': len(likes),
+        'likes_amount': post.likes_amount,
         'image_url': post.image.url if post.image else None,
         'published_at': post.published_at,
         'slug': post.slug,
-        'tags': [serialize_tag(tag) for tag in related_tags],
+        'tags': [serialize_tag_optimized(tag, tag.post_amount) for tag in related_tags],
     }
 
     most_popular_tags = Tag.objects.popular().annotate(post_amount=Count('posts'))[:5]
-
-    most_popular_posts = Post.objects.popular()  # TODO. Как это посчитать?
 
     count_for_id = Post.objects.fetch_with_comments_count()
 
@@ -112,8 +113,8 @@ def post_detail(request, slug):
         'popular_tags': [serialize_tag_optimized(tag, tag.post_amount) for tag in most_popular_tags.prefetch_related('posts')],
         'most_popular_posts': [
             serialize_post_optimized(post, count_for_id[post.id]) for post in most_popular_posts.prefetch_related(Prefetch('author'),
-                                                                                                                  Prefetch('tags', 
-                                                                                                                            queryset=(Tag.objects.annotate(post_amount=Count('posts')))))[:5]
+                                                                                                                  Prefetch('tags',
+                                                                                                                  queryset=(Tag.objects.annotate(post_amount=Count('posts')))))[:5]
         ],
     }
     return render(request, 'post-details.html', context)
@@ -124,7 +125,7 @@ def tag_filter(request, tag_title):
 
     most_popular_tags = Tag.objects.popular().annotate(post_amount=Count('posts'))[:5]
 
-    most_popular_posts = Post.objects.popular()  # TODO. Как это посчитать?
+    most_popular_posts = Post.objects.popular()
 
     related_posts = tag.posts.all()[:20]
 
@@ -133,9 +134,11 @@ def tag_filter(request, tag_title):
     context = {
         'tag': tag.title,
         'popular_tags': [serialize_tag_optimized(tag, tag.post_amount) for tag in most_popular_tags.prefetch_related('posts')],
-        'posts': [serialize_post_optimized(post, count_for_id[post.id]) for post in related_posts.prefetch_related(Prefetch('author'),
+        'posts': [
+            serialize_post_optimized(post, count_for_id[post.id]) for post in related_posts.prefetch_related(Prefetch('author'),
                                                                                                                   Prefetch('tags', 
-                                                                                                                            queryset=(Tag.objects.annotate(post_amount=Count('posts')))))],
+                                                                                                                            queryset=(Tag.objects.annotate(post_amount=Count('posts')))))
+        ],
         'most_popular_posts': [
             serialize_post_optimized(post, count_for_id[post.id]) for post in most_popular_posts.prefetch_related(Prefetch('author'),
                                                                                                                   Prefetch('tags', 
