@@ -16,12 +16,13 @@ class PostQuerySet(models.QuerySet):
         return most_popular_posts
 
     def fetch_with_comments_count(self):
-        most_popular_posts_ids = [post.id for post in self.popular()]
-        posts_with_comments = Post.objects.filter(id__in=most_popular_posts_ids) \
-                                          .annotate(comments_count=Count('comments'))
+        posts_ids = [post.id for post in self]
+        posts_with_comments = Post.objects.filter(id__in=posts_ids).annotate(comments_count=Count('comments'))
         ids_and_comments = posts_with_comments.values_list('id', 'comments_count')
         count_for_id = dict(ids_and_comments)
-        return count_for_id
+        for post in self:
+            post.comments_count = count_for_id[post.id]
+        return self
 
 
 class TagQuerySet(models.QuerySet):
@@ -30,13 +31,6 @@ class TagQuerySet(models.QuerySet):
         popular_tags = self.annotate(tags_amount=Count('posts')) \
                            .order_by('-tags_amount')
         return popular_tags
-
-    def fetch_with_posts_count(self):
-        most_popular_tags_ids = [tag.id for tag in self.popular()]
-        tag_with_posts = Tag.objects.filter(id__in=most_popular_tags_ids).annotate(posts_count=Count('posts'))
-        ids_and_posts = tag_with_posts.values_list('id', 'posts_count')
-        count_for_id = dict(ids_and_posts)
-        return count_for_id
 
 
 class Post(models.Model):
@@ -60,7 +54,7 @@ class Post(models.Model):
         'Tag',
         related_name='posts',
         verbose_name='Теги')
-    
+
     objects = PostQuerySet.as_manager()
 
     def __str__(self):
@@ -68,7 +62,7 @@ class Post(models.Model):
 
     def get_absolute_url(self):
         return reverse('post_detail', args={'slug': self.slug})
-  
+
     class Meta:
         ordering = ['-published_at']
         verbose_name = 'пост'
