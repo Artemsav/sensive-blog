@@ -10,24 +10,27 @@ class PostQuerySet(models.QuerySet):
     def year(self, year):
         posts_at_year = self.filter(published_at__year=year).order_by('published_at')
         return posts_at_year
-    
+
     def popular(self):
-        most_popular_posts = Post.objects.annotate(likes_amount=Count('likes')).order_by('-likes_amount')
+        most_popular_posts = self.annotate(likes_amount=models.Count('likes')).order_by('-likes_amount')
         return most_popular_posts
 
     def fetch_with_comments_count(self):
         most_popular_posts_ids = [post.id for post in self.popular()]
-        posts_with_comments = Post.objects.filter(id__in=most_popular_posts_ids).annotate(comments_count=Count('comments'))
+        posts_with_comments = Post.objects.filter(id__in=most_popular_posts_ids) \
+                                          .annotate(comments_count=Count('comments'))
         ids_and_comments = posts_with_comments.values_list('id', 'comments_count')
         count_for_id = dict(ids_and_comments)
         return count_for_id
 
+
 class TagQuerySet(models.QuerySet):
-    
+
     def popular(self):
-        popular_tags = Tag.objects.annotate(post_amount=Count('posts')).order_by('-post_amount')
+        popular_tags = self.annotate(tags_amount=Count('posts')) \
+                           .order_by('-tags_amount')
         return popular_tags
-    
+
     def fetch_with_posts_count(self):
         most_popular_tags_ids = [tag.id for tag in self.popular()]
         tag_with_posts = Tag.objects.filter(id__in=most_popular_tags_ids).annotate(posts_count=Count('posts'))
